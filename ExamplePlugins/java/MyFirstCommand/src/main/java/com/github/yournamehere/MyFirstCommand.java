@@ -1,57 +1,62 @@
 package com.github.yournamehere;
 
 import android.content.Context;
-import com.aliucord.Utils;
+import android.graphics.Color;
+import android.text.SpannableStringBuilder;
+import android.text.style.ForegroundColorSpan;
+
 import com.aliucord.annotations.AliucordPlugin;
-import com.aliucord.api.CommandsAPI;
 import com.aliucord.entities.Plugin;
-import com.discord.api.commands.ApplicationCommandType;
+import com.aliucord.patcher.Hook;
+import com.discord.stores.StoreStream;
+import com.discord.utilities.textprocessing.node.UserMentionNode;
+import com.discord.models.guild.Guild;
 
-import java.util.Arrays;
+import java.util.Map;
 
-// Aliucord Plugin annotation. Must be present on the main class of your plugin
-@AliucordPlugin(requiresRestart = false /* Whether your plugin requires a restart after being installed/updated */)
-// Plugin class. Must extend Plugin and override start and stop
-// Learn more: https://github.com/Aliucord/documentation/blob/main/plugin-dev/1_introduction.md#basic-plugin-structure
+@AliucordPlugin
 public class MyFirstCommand extends Plugin {
-    @Override
-    public void start(Context context) {
-        // Register a command with the name hello and description "My first command!" and no arguments.
-        // Learn more: https://github.com/Aliucord/documentation/blob/main/plugin-dev/2_commands.md
-        commands.registerCommand("hello", "My first command!", ctx -> {
-            // Just return a command result with hello world as the content
-            return new CommandsAPI.CommandResult(
-                    "Hello World!",
-                    null, // List of embeds
-                    false // Whether to send visible for everyone
-            );
-        });
-
-        // A bit more advanced command with arguments
-        commands.registerCommand(
-                "hellowitharguments",
-                "Hello World but with arguments!",
-                Arrays.asList(
-                        Utils.createCommandOption(ApplicationCommandType.STRING, "name", "Person to say hello to"),
-                        Utils.createCommandOption(ApplicationCommandType.USER, "user", "User to say hello to")
-                ),
-                ctx -> {
-                    // Check if a user argument was passed
-                    if (ctx.containsArg("user")) {
-                        var user = ctx.getRequiredUser("user");
-                        return new CommandsAPI.CommandResult("Hello " + user.getUsername() + "!");
-                    } else {
-                        // Returns either the argument value if present, or the defaultValue ("World" in this case)
-                        var name = ctx.getStringOrDefault("name", "World");
-                        return new CommandsAPI.CommandResult("Hello " + name + "!");
-                    }
-                }
-        );
-    }
 
     @Override
-    public void stop(Context context) {
-        // Unregister all commands
-        commands.unregisterAll();
-    }
-}
+        public void start(Context context) {
+                try {
+                            patcher.patch(UserMentionNode.class.getDeclaredMethod("render", SpannableStringBuilder.class, Object.class), new Hook(callFrame -> {
+                                            SpannableStringBuilder builder = (SpannableStringBuilder) callFrame.args[0];
+                                                            callFrame.setObjectExtra("startIndex", builder.length());
+                                                                        }) {
+                                                                                        @Override
+                                                                                                        public void after(de.robv.android.xposed.XC_MethodHook.MethodHookParam param) {
+                                                                                                                            SpannableStringBuilder builder = (SpannableStringBuilder) param.args[0];
+                                                                                                                                                int start = (int) getObjectExtra("startIndex");
+                                                                                                                                                                    int end = builder.length();
+                                                                                                                                                                                        
+                                                                                                                                                                                                            UserMentionNode node = (UserMentionNode) param.thisObject;
+                                                                                                                                                                                                                                long userId = node.getUserId();
+
+                                                                                                                                                                                                                                                    if (userId == StoreStream.getUsers().getMe().getId()) return;
+
+                                                                                                                                                                                                                                                                        boolean isMutual = false;
+                                                                                                                                                                                                                                                                                            Map<Long, Guild> myGuilds = StoreStream.getGuilds().getGuilds();
+                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                    for (Guild g : myGuilds.values()) {
+                                                                                                                                                                                                                                                                                                                                                            if (StoreStream.getGuilds().getMember(g.getId(), userId) != null) {
+                                                                                                                                                                                                                                                                                                                                                                                        isMutual = true;
+                                                                                                                                                                                                                                                                                                                                                                                                                    break;
+                                                                                                                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                }
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    int color = isMutual ? Color.GREEN : Color.RED;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        builder.setSpan(new ForegroundColorSpan(color), start, end, 33);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            } catch (Exception e) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        e.printStackTrace();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    }
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @Override
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            public void stop(Context context) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    patcher.unpatchAll();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
