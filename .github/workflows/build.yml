@@ -20,12 +20,6 @@ jobs:
         with:
           path: "src"
 
-      - name: Checkout builds
-        uses: actions/checkout@v4
-        with:
-          ref: "builds"
-          path: "builds"
-
       - name: Checkout Aliucord
         uses: actions/checkout@master
         with:
@@ -45,15 +39,11 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
-          ./gradlew make generateUpdaterJson
-          cp **/build/*.zip $GITHUB_WORKSPACE/builds
-          cp build/updater.json $GITHUB_WORKSPACE/builds
+          ./gradlew make
 
-      - name: Push builds
-        run: |
-          cd $GITHUB_WORKSPACE/builds
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-          git add .
-          git commit -m "Build $GITHUB_SHA" || exit 0   # do not error if nothing to commit
-          git push
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyFirstCommand-zip
+          path: src/**/build/*.zip
+          
